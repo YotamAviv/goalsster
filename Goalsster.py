@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import numpy
 
@@ -42,58 +43,47 @@ class Spec:
     def __str__(self):
         return "{}/{}".format(self.goal, self.period)
 
+    def to_json_obj(self):
+        return json.dumps({'goal': self.goal, 'period': self.period})
+
+    @staticmethod
+    def from_json_obj(obj):
+        d = json.loads(obj)
+        goal = d['goal']
+        period = d['period']
+        return Spec(goal, period)
+
 
 # TODO:...
 MAX_HISTORY = 1000  # should work until 1000 days after 1/1/2021
-
-
-class Goalsster:
-    DAY_FACTORY = None
-
-    def __init__(self):
-        self.goals = []
-
-    def add(self, goal):
-        self.goals.append(goal)
-
-    def dump(self):
-        sortfunc = lambda goal: goal.score()
-        sorted_goals = sorted(self.goals, key=sortfunc)
-        for goal in sorted_goals:
-            print(goal)
-
-        return
-
-    def ui(self):
-        sortfunc = lambda goal: goal.score()
-        while True:
-            screen_clear()
-
-            print("Today is: {}".format(Goalsster.DAY_FACTORY.get_today()))
-
-            sorted_goals = sorted(self.goals, key=sortfunc)
-            index = 0
-            for goal in sorted_goals:
-                print("{}) {}".format(index, goal))
-                index = index + 1
-
-            s = input("Which one did you just do?\n")
-            try:
-                index = int(s)
-                sorted_goals[index].make()
-            except:
-                # do nothing
-                print()
+STUB_TODAY = 100
 
 
 class Goal:
-    def __init__(self, name, details, spec):
-        history = numpy.zeros(MAX_HISTORY, dtype=int)
+    def __init__(self, name, details, spec, history=None):
+        if (history is None):
+            history = numpy.zeros(MAX_HISTORY, dtype=int)
 
         self.spec = spec
         self.name = name
         self.details = details
         self.history = history
+
+    def to_json_obj(self):
+        dict = {}
+        dict['spec'] = self.spec.to_json_obj()
+        dict['name'] = self.name
+        dict['details'] = self.details
+        dict['history'] = self.history.tolist()
+        return dict
+
+    @staticmethod
+    def from_json_obj(dict):
+        spec = Spec.from_json_obj(dict['spec'])
+        name = dict['name']
+        details = dict['details']
+        history = numpy.asarray(dict['history'])
+        return Goal(name, details, spec, history)
 
     # Getting rid of "rest", not sure what to do with it.
     # # TODO: Maybe move this code to Spec
@@ -152,9 +142,48 @@ class Goal:
         return total < self.spec.goal
 
 
+class Goalsster:
+    DAY_FACTORY = None
+
+    def __init__(self):
+        self.goals = []
+
+    def add(self, goal):
+        self.goals.append(goal)
+
+    def dump(self):
+        sortfunc = lambda goal: goal.score()
+        sorted_goals = sorted(self.goals, key=sortfunc)
+        for goal in sorted_goals:
+            print(goal)
+
+        return
+
+    def ui(self):
+        sortfunc = lambda goal: goal.score()
+        while True:
+            screen_clear()
+
+            print("Today is: {}".format(Goalsster.DAY_FACTORY.get_today()))
+
+            sorted_goals = sorted(self.goals, key=sortfunc)
+            index = 0
+            for goal in sorted_goals:
+                print("{}) {}".format(index, goal))
+                index = index + 1
+
+            s = input("Which one did you just do?\n")
+            try:
+                index = int(s)
+                sorted_goals[index].make()
+            except:
+                # do nothing
+                print()
+
+
 def test2():
     Goalsster.DAY_FACTORY = StubDayFactory()
-    Goalsster.DAY_FACTORY.set_today(100)
+    Goalsster.DAY_FACTORY.set_today(STUB_TODAY)
 
     goalsster = Goalsster()
 
@@ -165,12 +194,12 @@ def test2():
     goalsster.add(pushups)
     pushups.make()
     # do pushups yesterday
-    Goalsster.DAY_FACTORY.set_today(99)
+    Goalsster.DAY_FACTORY.set_today(STUB_TODAY - 1)
     pushups.make()
     # do pushups day before yesterday
-    Goalsster.DAY_FACTORY.set_today(98)
+    Goalsster.DAY_FACTORY.set_today(STUB_TODAY - 2)
     pushups.make()
-    Goalsster.DAY_FACTORY.set_today(100)
+    Goalsster.DAY_FACTORY.set_today(STUB_TODAY)
 
     goalsster.add(Goal("word of the week", "Groovy", Spec(5, 10)))
 
@@ -183,6 +212,42 @@ def test2():
 
 
 test2()
+
+
+def test_json():
+    Goalsster.DAY_FACTORY = StubDayFactory()
+    Goalsster.DAY_FACTORY.set_today(STUB_TODAY)
+
+    # Spec
+    spec1 = Spec(3, 365)
+    spec1_json_obj = spec1.to_json_obj()
+    spec1_json = json.dumps(spec1_json_obj)
+    # print("spec1_json = {}".format(spec1_json))
+
+    spec2_json_obj = json.loads(spec1_json)
+    spec2 = Spec.from_json_obj(spec2_json_obj)
+    spec2_json_obj = spec2.to_json_obj()
+    spec2_json = json.dumps(spec2_json_obj)
+    # print("spec2_json = {}".format(spec2_json))
+    assert spec1_json == spec2_json
+
+    # Goal
+    goal1 = Goal("run", "Run.", spec1)
+    goal1.make()
+    goal1_json_obj = goal1.to_json_obj()
+    goal1_json = json.dumps(goal1_json_obj)
+    print("goal1_json = {}".format(goal1_json))
+
+    goal2_json_obj = json.loads(goal1_json)
+    goal2 = Goal.from_json_obj(goal2_json_obj)
+    goal2_json_obj = goal2.to_json_obj()
+    goal2_json = json.dumps(goal2_json_obj)
+    # print("goal2 = {}".format(goal2))
+    print("goal2_json = {}".format(goal2_json))
+    assert goal1_json == goal2_json
+
+
+test_json()
 
 
 def runUI():
@@ -201,6 +266,5 @@ def runUI():
     goalsster.add(swim)
 
     goalsster.ui()
-
 
 runUI()
