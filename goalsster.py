@@ -5,12 +5,17 @@ import numpy
 
 
 # NEXT STEPS:
+
 # Persistence:
-# Allow for my editing JSON files to fudge history, create new goals, edit goals. This is so that the UI for any of
-# those can be deferred.
+# Allow for my editing JSON files to fudge history (edit the saved files by hand), create new goals, edit goals.
+# This is so that the UI for any of those can be deferred.
 #
-# Cloud (AppEngine mostly likely, maybe in Java)
+# Cloud:
+# (AppEngine mostly likely, maybe in Java)
 # Possibly before Persistence
+
+# TODO:...
+MAX_HISTORY = 1000  # should work until 1000 days after 1/1/2021
 
 def screen_clear():
     if os.name == 'posix':
@@ -19,20 +24,6 @@ def screen_clear():
     else:
         # for windows platfrom
         _ = os.system('cls')
-
-
-class RealDayFactory:
-    def get_today(self):
-        days = (datetime.datetime.utcnow() - datetime.datetime(2021, 1, 1)).days
-        return days
-
-
-class StubDayFactory:
-    def set_today(self, day):
-        self.day = day
-
-    def get_today(self):
-        return self.day
 
 
 class Spec:
@@ -53,27 +44,32 @@ class Spec:
         period = d['period']
         return Spec(goal, period)
 
+class RealDayFactory:
+    def get_today(self):
+        days = (datetime.datetime.utcnow() - datetime.datetime(2021, 1, 1)).days
+        return days
 
-# TODO:...
-MAX_HISTORY = 1000  # should work until 1000 days after 1/1/2021
-STUB_TODAY = 100
 
 
 class Goal:
-    def __init__(self, name, details, spec, history=None):
+    def __init__(self, name, details, spec, created, history=None):
         if (history is None):
             history = numpy.zeros(MAX_HISTORY, dtype=int)
 
         self.spec = spec
         self.name = name
         self.details = details
+        self.created = created
         self.history = history
 
     def to_json_obj(self):
         dict = {}
+        # NOTE: If this were any bigger, I'd [aviv ] come up with a mechanism to nest objects that have a "to_json_obj"
+        # inside each other.
         dict['spec'] = self.spec.to_json_obj()
         dict['name'] = self.name
         dict['details'] = self.details
+        dict['created'] = self.created
         dict['history'] = self.history.tolist()
         return dict
 
@@ -82,8 +78,9 @@ class Goal:
         spec = Spec.from_json_obj(dict['spec'])
         name = dict['name']
         details = dict['details']
-        history = numpy.asarray(dict['history'])
-        return Goal(name, details, spec, history)
+        created = dict['created'] # day number (since 1/1/2021) this goal was created.
+        history = numpy.asarray(dict['history']) # history of this goal starting when it was created.
+        return Goal(name, details, spec, created, history)
 
     # Getting rid of "rest", not sure what to do with it.
     # # TODO: Maybe move this code to Spec
@@ -97,8 +94,8 @@ class Goal:
 
     def make(self):
         today = Goalsster.DAY_FACTORY.get_today()
-        made = self.history[today]
-        self.history[today] = made + 1
+        made = self.history[today - self.created]
+        self.history[today - self.created] = made + 1
 
     def __str__(self):
         failing = ""
@@ -112,9 +109,10 @@ class Goal:
 
         score = 0
         today = Goalsster.DAY_FACTORY.get_today()
+        today_offset = today - self.created
         hits = 0
         for i in range(0, spec.period):
-            day = today - i
+            day = today_offset - i
             done = self.get_history(day)
             for j in range(0, done):
                 hits += 1
@@ -134,9 +132,13 @@ class Goal:
 
     # TODO: Make it so that new Goals aren't in failure, use a Goal created date or something.
     def is_failing(self):
+        if self.spec.period > (Goalsster.DAY_FACTORY.get_today() - self.created):
+            return False
+
         total = 0
         for i in range(0, self.spec.period):
             day = Goalsster.DAY_FACTORY.get_today() - i
+            day_offset = day - self.created
             done = self.get_history(day)
             total += done
         return total < self.spec.goal
@@ -147,6 +149,11 @@ class Goalsster:
 
     def __init__(self):
         self.goals = []
+
+    def to_json_obj(self):
+        dict = {}
+        dict['goals'] = list(map(lambda spec : spec.to_json_obj(), self.goals))
+        return dict
 
     def add(self, goal):
         self.goals.append(goal)
@@ -177,5 +184,6 @@ class Goalsster:
                 index = int(s)
                 sorted_goals[index].make()
             except:
-                # do nothing
+                # do nothing. (Nothing didn't work, and so I added "print()")
                 print()
+
