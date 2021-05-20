@@ -3,7 +3,12 @@ import json
 import os
 import numpy
 
-
+# Immediate next steps
+# - tests silent (they pass)
+# - stub date business clear, crisp
+# - history and created considered carefully (they're right, but might be off by one and might benefit from a few
+#   helpers)
+#
 # NEXT STEPS:
 
 # Persistence:
@@ -16,6 +21,7 @@ import numpy
 
 # TODO:...
 MAX_HISTORY = 1000  # should work until 1000 days after 1/1/2021
+
 
 def screen_clear():
     if os.name == 'posix':
@@ -44,11 +50,11 @@ class Spec:
         period = d['period']
         return Spec(goal, period)
 
+
 class RealDayFactory:
     def get_today(self):
         days = (datetime.datetime.utcnow() - datetime.datetime(2021, 1, 1)).days
         return days
-
 
 
 class Goal:
@@ -78,8 +84,8 @@ class Goal:
         spec = Spec.from_json_obj(dict['spec'])
         name = dict['name']
         details = dict['details']
-        created = dict['created'] # day number (since 1/1/2021) this goal was created.
-        history = numpy.asarray(dict['history']) # history of this goal starting when it was created.
+        created = dict['created']  # day number (since 1/1/2021) this goal was created.
+        history = numpy.asarray(dict['history'])  # history of this goal starting when it was created.
         return Goal(name, details, spec, created, history)
 
     # Getting rid of "rest", not sure what to do with it.
@@ -97,13 +103,14 @@ class Goal:
         made = self.history[today - self.created]
         self.history[today - self.created] = made + 1
 
+    # TODO: Move to a UI class
     def __str__(self):
         failing = ""
-        if self.is_failing():
+        if self.compute_is_failing():
             failing = "FAILING "
-        return "{}{:.2f} {} \"{}\" ({})".format(failing, self.score(), self.name, self.details, self.spec)
+        return "{}{:.2f} {} \"{}\" ({})".format(failing, self.compute_score(), self.name, self.details, self.spec)
 
-    def score(self):
+    def compute_score(self):
         spec = self.spec
         history = self.history
 
@@ -130,8 +137,8 @@ class Goal:
 
         return score
 
-    # TODO: Make it so that new Goals aren't in failure, use a Goal created date or something.
-    def is_failing(self):
+    def compute_is_failing(self):
+        # New Goals aren't in failure until (spec.period days have elapsed from when created).
         if self.spec.period > (Goalsster.DAY_FACTORY.get_today() - self.created):
             return False
 
@@ -152,38 +159,45 @@ class Goalsster:
 
     def to_json_obj(self):
         dict = {}
-        dict['goals'] = list(map(lambda spec : spec.to_json_obj(), self.goals))
+        dict['goals'] = list(map(lambda spec: spec.to_json_obj(), self.goals))
         return dict
 
     def add(self, goal):
         self.goals.append(goal)
 
+    # (sorted)
+    def compute_sorted_goals(self):
+        # (goals in failure first.)
+        def sort(goal):
+            if goal.compute_is_failing():
+                failing_penalty = 0
+            else:
+                failing_penalty = 1
+            return goal.compute_score() + failing_penalty
+
+        return sorted(self.goals, key=sort)
+
     def dump(self):
-        sortfunc = lambda goal: goal.score()
-        sorted_goals = sorted(self.goals, key=sortfunc)
+        sorted_goals = self.compute_sorted_goals()
         for goal in sorted_goals:
             print(goal)
 
-        return
-
     def ui(self):
-        sortfunc = lambda goal: goal.score()
         while True:
             screen_clear()
 
             print("Today is: {}".format(Goalsster.DAY_FACTORY.get_today()))
 
-            sorted_goals = sorted(self.goals, key=sortfunc)
+            goals = self.compute_sorted_goals()
             index = 0
-            for goal in sorted_goals:
+            for goal in goals:
                 print("{}) {}".format(index, goal))
                 index = index + 1
 
             s = input("Which one did you just do?\n")
             try:
                 index = int(s)
-                sorted_goals[index].make()
+                goals[index].make()
             except:
                 # do nothing. (Nothing didn't work, and so I added "print()")
                 print()
-

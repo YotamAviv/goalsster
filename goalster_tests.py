@@ -5,6 +5,7 @@ from goalsster import Spec
 
 STUB_TODAY = 3
 
+
 class StubDayFactory:
     def set_today(self, day):
         self.day = day
@@ -19,41 +20,35 @@ def test2():
 
     goalsster = Goalsster()
 
-    run = Goal("run", "Run.", Spec(2, 10), STUB_TODAY- 3)
+    # run
+    run = Goal("run", "Run.", Spec(2, 10), STUB_TODAY - 3)
     goalsster.add(run)
 
-    pushups = Goal("push-ups", "Do 100 push ups, 2 minute breaks", Spec(2, 6), STUB_TODAY - 5)
+    # pushups
+    # created 5 days ago
+    pushups = Goal("push-ups", "Do 100 push ups, 2 minute breaks", Spec(2, 4), STUB_TODAY - 5)
     goalsster.add(pushups)
-    pushups.make()
-    # do pushups yesterday
+    # done yesterday
     Goalsster.DAY_FACTORY.set_today(STUB_TODAY - 1)
     pushups.make()
-    # do pushups day before yesterday
+    # done day before yesterday
     Goalsster.DAY_FACTORY.set_today(STUB_TODAY - 2)
     pushups.make()
-    Goalsster.DAY_FACTORY.set_today(STUB_TODAY)
 
-    goalsster.add(Goal("word of the week", "Groovy", Spec(5, 10), STUB_TODAY - 2))
-
+    # swim
     swim = Goal("swim", "Swim.", Spec(3, 365), STUB_TODAY - 2)
     goalsster.add(swim)
     swim.make()
     swim.make()
 
     goalsster.dump()
-
-    print()
-    print("Setting day to be 7 days forward")
-    Goalsster.DAY_FACTORY.set_today(STUB_TODAY + 7)
     print()
 
-    goalsster.dump()
-    print()
-    print("Setting day to be another 7 days forward")
-    Goalsster.DAY_FACTORY.set_today(STUB_TODAY + 14)
-    print()
+    for i in range(0, 10):
+        Goalsster.DAY_FACTORY.set_today(STUB_TODAY + i)
+        goalsster.dump()
+        print()
 
-    goalsster.dump()
 
 test2()
 
