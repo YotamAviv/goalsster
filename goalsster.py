@@ -4,10 +4,10 @@ import os
 import numpy
 
 # Immediate next steps
-# - tests silent (they pass)
+# - tests silent (they pass, they don't print)
 # - stub date business clear, crisp
-# - history and created considered carefully (they're right, but might be off by one and might benefit from a few
-#   helpers)
+# - history and created considered carefully (I think that they're correct as is, but they might be off by one and and
+#   might benefit from a few helper functions)
 #
 # NEXT STEPS:
 
